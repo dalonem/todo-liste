@@ -19,6 +19,7 @@ format:
       placeholder="E-Mail-Adresse"
       required
     />
+
     <label for="password">Passwort</label>
     <input
       id="password"
@@ -27,11 +28,15 @@ format:
       placeholder="Passwort"
       required
     />
+
+    <button id="login-submit-hidden" type="submit" hidden>Absenden</button>
   </form>
 
-  <button id="login" type="submit">Anmelden</button>
-  <button id="register" type="button">Konto erstellen</button>
-  <button id="reset-password" type="button">Passwort zurücksetzen</button>
+  <div class="auth-buttons">
+    <button id="login" type="button">Anmelden</button>
+    <button id="register" type="button">Konto erstellen</button>
+    <button id="reset-password" type="button">Passwort zurücksetzen</button>
+  </div>
 </div>
 
 <div id="app-panel" hidden>
@@ -322,19 +327,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  $("login-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function loginUser() {
+    const email = $("email").value.trim();
+    const password = $("password").value;
+
+    if (!email || !password) {
+      setMessage("Bitte E-Mail-Adresse und Passwort eingeben.");
+      return;
+    }
+
     $("login").disabled = true;
     setMessage("Anmeldung läuft …");
 
     try {
       const { data, error } = await client.auth.signInWithPassword({
-        email: $("email").value.trim(),
-        password: $("password").value
+        email,
+        password
       });
 
       if (error) {
         setMessage("Anmeldung fehlgeschlagen: " + error.message);
+        return;
+      }
+
+      if (!data.user) {
+        setMessage("Anmeldung fehlgeschlagen: Kein Nutzer zurückgegeben.");
         return;
       }
 
@@ -344,6 +361,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     } finally {
       $("login").disabled = false;
     }
+  }
+
+  $("login").addEventListener("click", loginUser);
+
+  $("login-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loginUser();
   });
 
   $("register").addEventListener("click", async () => {
