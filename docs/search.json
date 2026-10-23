@@ -1,0 +1,30 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "To-do-Liste",
+    "section": "",
+    "text": "Melde dich an, um deine Aufgaben zu laden.\n\nE-Mail  Passwort \n\n&lt;button id=\"login\"&gt;Anmelden&lt;/button&gt;\n&lt;button id=\"register\"&gt;Konto erstellen&lt;/button&gt;\n\nPasswort zurücksetzen"
+  },
+  {
+    "objectID": "index.html#ltc",
+    "href": "index.html#ltc",
+    "title": "To-do-Liste",
+    "section": "LTC",
+    "text": "LTC\n\nNeuro Grundlagen\nLaktat Prozesse\nLeistungsphysiologie Vortrag reinlesen\nWas bedeutet |&gt; in R?"
+  },
+  {
+    "objectID": "index.html#prüfungsleistungen",
+    "href": "index.html#prüfungsleistungen",
+    "title": "To-do-Liste",
+    "section": "Prüfungsleistungen",
+    "text": "Prüfungsleistungen\n\nLEK Mid-Term Statistische Datenanalyse\nVortrag Leistungsphysiologie\nLEK Full-Term Statistische Datenanalyse\nMündliche Prüfung\nSeminar? Pädagogik als Team 2\nKlausur"
+  },
+  {
+    "objectID": "index.html#alltag",
+    "href": "index.html#alltag",
+    "title": "To-do-Liste",
+    "section": "Alltag",
+    "text": "Alltag\n\nZugtickets Weihnachten\ngemütlicher Stuhl\nTeppich 130cm\nWandregale\nPapiermüll\nGeschenk Papa"
+  }
+]
