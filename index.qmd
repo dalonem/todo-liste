@@ -1,4 +1,3 @@
-
 ---
 title: "To-do-Liste"
 format:
@@ -10,26 +9,38 @@ format:
 <div id="auth-panel">
   <h2>Anmeldung</h2>
   <p id="auth-message">Melde dich an, um deine Aufgaben zu laden.</p>
-  <label for="email">E-Mail</label>
-  <input id="email" type="email" autocomplete="username"
-         placeholder="E-Mail-Adresse" />
-  <label for="password">Passwort</label>
-  <input id="password" type="password"
-         autocomplete="current-password" placeholder="Passwort" />
-  <div class="auth-buttons">
-    <button id="login">Anmelden</button>
-    <button id="register">Konto erstellen</button>
-  </div>
-  <button id="reset-password">Passwort zurücksetzen</button>
+
+  <form id="login-form">
+    <label for="email">E-Mail</label>
+    <input
+      id="email"
+      type="email"
+      autocomplete="username"
+      placeholder="E-Mail-Adresse"
+      required
+    />
+    <label for="password">Passwort</label>
+    <input
+      id="password"
+      type="password"
+      autocomplete="current-password"
+      placeholder="Passwort"
+      required
+    />
+  </form>
+
+  <button id="login" type="submit">Anmelden</button>
+  <button id="register" type="button">Konto erstellen</button>
+  <button id="reset-password" type="button">Passwort zurücksetzen</button>
 </div>
 
 <div id="app-panel" hidden>
   <p>Angemeldet: <span id="user-email"></span></p>
-  <button id="logout">Abmelden</button>
+  <button id="logout" type="button">Abmelden</button>
   <p id="sync-status">Lade Aufgaben …</p>
 </div>
 
-<div id="todo-content" hidden>
+::: {#todo-content hidden="hidden"}
 
 ## LTC
 
@@ -56,7 +67,7 @@ format:
 - [ ] Papiermüll
 - [ ] Geschenk Papa
 
-</div>
+:::
 
 <style>
 #auth-panel {
@@ -66,6 +77,7 @@ format:
   border: 1px solid #ccc;
   border-radius: 10px;
 }
+
 #auth-panel label,
 #auth-panel input {
   display: block;
@@ -73,22 +85,33 @@ format:
   box-sizing: border-box;
   margin: 0.4rem 0;
 }
+
 #auth-panel input {
   padding: 0.65rem;
 }
+
+#auth-panel button,
+#app-panel button {
+  cursor: pointer;
+  padding: 0.55rem 0.85rem;
+}
+
 .auth-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 1rem 0;
 }
+
 #todo-content li input[type="date"] {
   margin-left: 12px;
   font: inherit;
 }
+
 #todo-content li input[type="checkbox"] {
   margin-right: 6px;
 }
+
 #sync-status {
   font-size: 0.9rem;
 }
@@ -102,9 +125,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const SUPABASE_KEY = "sb_publishable_c4HSOzjc5uD7noHzGLPMMg_RFUfIc66";
 
   const $ = (id) => document.getElementById(id);
-  const client = window.supabase.createClient(
-    SUPABASE_URL, SUPABASE_KEY
-  );
+
+  if (!window.supabase) {
+    $("auth-message").textContent =
+      "Supabase konnte nicht geladen werden. Prüfe deine Internetverbindung.";
+    return;
+  }
+
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let currentUser = null;
   let tasks = [];
@@ -118,12 +146,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("sync-status").textContent = message;
   };
 
-  function getTaskText(item, checkbox) {
+  function getTaskText(item) {
     const clone = item.cloneNode(true);
-    clone.querySelectorAll(
-      'input, button, script, style'
-    ).forEach(el => el.remove());
-
+    clone.querySelectorAll("input, button, script, style").forEach((el) => el.remove());
     return clone.textContent.trim().replace(/\s+/g, " ");
   }
 
@@ -134,11 +159,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   function collectTasks() {
     const checkboxes = [
       ...document.querySelectorAll(
-        "#todo-content li input[type=checkbox]"
+        '#todo-content li input[type="checkbox"]'
       )
     ];
 
     return checkboxes.map((checkbox, index) => {
+      // Quarto/Pandoc kann Aufgaben-Checkboxen standardmäßig deaktivieren.
+      // Hier aktivieren wir sie, damit sie anklickbar sind.
+      checkbox.disabled = false;
+
       const item = checkbox.closest("li");
       let dateInput = item.querySelector('input[type="date"]');
 
@@ -149,12 +178,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         item.appendChild(dateInput);
       }
 
-      const title = getTaskText(item, checkbox);
+      const title = getTaskText(item);
       const key = getTaskKey(index, title);
 
       return {
-        item, checkbox, dateInput,
-        title, key, sortOrder: index
+        item,
+        checkbox,
+        dateInput,
+        title,
+        key,
+        sortOrder: index
       };
     });
   }
@@ -167,13 +200,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (error) throw error;
 
-    const saved = new Map(data.map(row => [row.task_key, row]));
-
-    // Neue Aufgaben ergänzen, ohne gespeicherte Werte zu überschreiben.
-    const missing = tasks.filter(task => !saved.has(task.key));
+    const saved = new Map(data.map((row) => [row.task_key, row]));
+    const missing = tasks.filter((task) => !saved.has(task.key));
 
     if (missing.length) {
-      const rows = missing.map(task => ({
+      const rows = missing.map((task) => ({
         user_id: currentUser.id,
         task_key: task.key,
         title: task.title,
@@ -191,7 +222,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return loadTasks();
     }
 
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const row = saved.get(task.key);
       if (!row) return;
 
@@ -205,7 +236,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function sortTasks() {
     const groups = new Map();
 
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const parent = task.item.parentElement;
       if (!groups.has(parent)) groups.set(parent, []);
       groups.get(parent).push(task);
@@ -215,25 +246,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       items.sort((a, b) => {
         const da = a.dateInput.value;
         const db = b.dateInput.value;
+
         if (!da && !db) return a.sortOrder - b.sortOrder;
         if (!da) return 1;
         if (!db) return -1;
+
         return da.localeCompare(db) || a.sortOrder - b.sortOrder;
       });
 
-      items.forEach(task => parent.appendChild(task.item));
+      items.forEach((task) => parent.appendChild(task.item));
     });
   }
 
   function saveTasks() {
-    if (!currentUser) return;
+    if (!currentUser) return Promise.resolve();
 
-    // Warteschlange verhindert, dass schnelle Änderungen
-    // sich beim Speichern gegenseitig überholen.
     saveQueue = saveQueue.then(async () => {
       setStatus("Synchronisiere …");
 
-      const rows = tasks.map(task => ({
+      const rows = tasks.map((task) => ({
         user_id: currentUser.id,
         task_key: task.key,
         title: task.title,
@@ -249,7 +280,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (error) throw error;
       setStatus("Synchronisiert");
-    }).catch(error => {
+    }).catch((error) => {
       console.error(error);
       setStatus("Speichern fehlgeschlagen: " + error.message);
     });
@@ -273,9 +304,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       setStatus("Lade Aufgaben …");
       await loadTasks();
 
-      tasks.forEach(task => {
+      tasks.forEach((task) => {
         task.checkbox.addEventListener("change", () => {
-          saveTasks();
+          void saveTasks();
         });
 
         task.dateInput.addEventListener("change", async () => {
@@ -291,42 +322,85 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  $("login").addEventListener("click", async () => {
-    const { data, error } = await client.auth.signInWithPassword({
-      email: $("email").value.trim(),
-      password: $("password").value
-    });
+  $("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    $("login").disabled = true;
+    setMessage("Anmeldung läuft …");
 
-    if (error) return setMessage(error.message);
-    await openApp(data.user);
+    try {
+      const { data, error } = await client.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value
+      });
+
+      if (error) {
+        setMessage("Anmeldung fehlgeschlagen: " + error.message);
+        return;
+      }
+
+      await openApp(data.user);
+    } catch (error) {
+      setMessage("Anmeldung fehlgeschlagen: " + error.message);
+    } finally {
+      $("login").disabled = false;
+    }
   });
 
   $("register").addEventListener("click", async () => {
-    const { data, error } = await client.auth.signUp({
-      email: $("email").value.trim(),
-      password: $("password").value
-    });
+    const email = $("email").value.trim();
+    const password = $("password").value;
 
-    if (error) return setMessage(error.message);
+    if (!email || !password) {
+      setMessage("Bitte E-Mail-Adresse und Passwort eingeben.");
+      return;
+    }
 
-    if (!data.session) {
-      setMessage("Prüfe deine E-Mails und bestätige deine Registrierung.");
-    } else {
-      await openApp(data.user);
+    $("register").disabled = true;
+    setMessage("Konto wird erstellt …");
+
+    try {
+      const { data, error } = await client.auth.signUp({ email, password });
+
+      if (error) {
+        setMessage("Registrierung fehlgeschlagen: " + error.message);
+        return;
+      }
+
+      if (!data.session) {
+        setMessage("Prüfe deine E-Mails und bestätige deine Registrierung.");
+      } else if (data.user) {
+        await openApp(data.user);
+      }
+    } catch (error) {
+      setMessage("Registrierung fehlgeschlagen: " + error.message);
+    } finally {
+      $("register").disabled = false;
     }
   });
 
   $("reset-password").addEventListener("click", async () => {
     const email = $("email").value.trim();
-    if (!email) return setMessage("Gib zuerst deine E-Mail-Adresse ein.");
+
+    if (!email) {
+      setMessage("Gib zuerst deine E-Mail-Adresse ein.");
+      return;
+    }
 
     const { error } = await client.auth.resetPasswordForEmail(email);
-    setMessage(error ? error.message : "Falls ein Konto existiert, erhältst du eine E-Mail.");
+    setMessage(
+      error
+        ? "Fehler: " + error.message
+        : "Falls ein Konto existiert, erhältst du eine E-Mail."
+    );
   });
 
   $("logout").addEventListener("click", async () => {
     const { error } = await client.auth.signOut();
-    if (error) return setStatus(error.message);
+
+    if (error) {
+      setStatus("Abmelden fehlgeschlagen: " + error.message);
+      return;
+    }
 
     currentUser = null;
     tasks = [];
@@ -339,7 +413,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const { data, error } = await client.auth.getSession();
 
   if (error) {
-    setMessage(error.message);
+    setMessage("Sitzung konnte nicht geladen werden: " + error.message);
     return;
   }
 
