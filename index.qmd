@@ -1,0 +1,350 @@
+
+---
+title: "To-do-Liste"
+format:
+  html:
+    page-layout: full
+    toc: false
+---
+
+<div id="auth-panel">
+  <h2>Anmeldung</h2>
+  <p id="auth-message">Melde dich an, um deine Aufgaben zu laden.</p>
+  <label for="email">E-Mail</label>
+  <input id="email" type="email" autocomplete="username"
+         placeholder="E-Mail-Adresse" />
+  <label for="password">Passwort</label>
+  <input id="password" type="password"
+         autocomplete="current-password" placeholder="Passwort" />
+  <div class="auth-buttons">
+    <button id="login">Anmelden</button>
+    <button id="register">Konto erstellen</button>
+  </div>
+  <button id="reset-password">Passwort zurücksetzen</button>
+</div>
+
+<div id="app-panel" hidden>
+  <p>Angemeldet: <span id="user-email"></span></p>
+  <button id="logout">Abmelden</button>
+  <p id="sync-status">Lade Aufgaben …</p>
+</div>
+
+<div id="todo-content" hidden>
+
+## LTC
+
+- [ ] Neuro Grundlagen
+- [ ] Laktat Prozesse
+- [ ] Leistungsphysiologie Vortrag reinlesen
+- [ ] Was bedeutet |> in R?
+
+## Prüfungsleistungen
+
+- [ ] <span style="color: blue"><strong>LEK</strong></span> <strong><u>Mid-Term</u></strong> Statistische Datenanalyse
+- [ ] <span style="color: orange"><strong>Vortrag</strong></span> Leistungsphysiologie
+- [ ] <span style="color: blue"><strong>LEK</strong></span> <strong><u>Full-Term</u></strong> Statistische Datenanalyse
+- [ ] <span style="color: red"><strong>Mündliche Prüfung</strong></span>
+- [ ] <span style="color: green"><strong>Seminar?</strong></span> Pädagogik als Team 2
+- [ ] <span style="color: blue"><strong>Klausur</strong></span>
+
+## Alltag
+
+- [ ] Zugtickets Weihnachten
+- [ ] gemütlicher Stuhl
+- [ ] Teppich 130cm
+- [ ] Wandregale
+- [ ] Papiermüll
+- [ ] Geschenk Papa
+
+</div>
+
+<style>
+#auth-panel {
+  max-width: 420px;
+  margin: 2rem auto;
+  padding: 1.25rem;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+}
+#auth-panel label,
+#auth-panel input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.4rem 0;
+}
+#auth-panel input {
+  padding: 0.65rem;
+}
+.auth-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+#todo-content li input[type="date"] {
+  margin-left: 12px;
+  font: inherit;
+}
+#todo-content li input[type="checkbox"] {
+  margin-right: 6px;
+}
+#sync-status {
+  font-size: 0.9rem;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const SUPABASE_URL = "https://ixrpqqexnsuhiaafamki.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_c4HSOzjc5uD7noHzGLPMMg_RFUfIc66";
+
+  const $ = (id) => document.getElementById(id);
+  const client = window.supabase.createClient(
+    SUPABASE_URL, SUPABASE_KEY
+  );
+
+  let currentUser = null;
+  let tasks = [];
+  let saveQueue = Promise.resolve();
+
+  const setMessage = (message) => {
+    $("auth-message").textContent = message;
+  };
+
+  const setStatus = (message) => {
+    $("sync-status").textContent = message;
+  };
+
+  function getTaskText(item, checkbox) {
+    const clone = item.cloneNode(true);
+    clone.querySelectorAll(
+      'input, button, script, style'
+    ).forEach(el => el.remove());
+
+    return clone.textContent.trim().replace(/\s+/g, " ");
+  }
+
+  function getTaskKey(index, title) {
+    return `${index}:${title}`;
+  }
+
+  function collectTasks() {
+    const checkboxes = [
+      ...document.querySelectorAll(
+        "#todo-content li input[type=checkbox]"
+      )
+    ];
+
+    return checkboxes.map((checkbox, index) => {
+      const item = checkbox.closest("li");
+      let dateInput = item.querySelector('input[type="date"]');
+
+      if (!dateInput) {
+        dateInput = document.createElement("input");
+        dateInput.type = "date";
+        dateInput.setAttribute("aria-label", "Fälligkeitsdatum");
+        item.appendChild(dateInput);
+      }
+
+      const title = getTaskText(item, checkbox);
+      const key = getTaskKey(index, title);
+
+      return {
+        item, checkbox, dateInput,
+        title, key, sortOrder: index
+      };
+    });
+  }
+
+  async function loadTasks() {
+    const { data, error } = await client
+      .from("todo_tasks")
+      .select("task_key,title,completed,due_date,sort_order")
+      .eq("user_id", currentUser.id);
+
+    if (error) throw error;
+
+    const saved = new Map(data.map(row => [row.task_key, row]));
+
+    // Neue Aufgaben ergänzen, ohne gespeicherte Werte zu überschreiben.
+    const missing = tasks.filter(task => !saved.has(task.key));
+
+    if (missing.length) {
+      const rows = missing.map(task => ({
+        user_id: currentUser.id,
+        task_key: task.key,
+        title: task.title,
+        completed: task.checkbox.checked,
+        due_date: task.dateInput.value || null,
+        sort_order: task.sortOrder
+      }));
+
+      const { error: insertError } = await client
+        .from("todo_tasks")
+        .upsert(rows, { onConflict: "user_id,task_key" });
+
+      if (insertError) throw insertError;
+
+      return loadTasks();
+    }
+
+    tasks.forEach(task => {
+      const row = saved.get(task.key);
+      if (!row) return;
+
+      task.checkbox.checked = row.completed;
+      task.dateInput.value = row.due_date || "";
+    });
+
+    sortTasks();
+  }
+
+  function sortTasks() {
+    const groups = new Map();
+
+    tasks.forEach(task => {
+      const parent = task.item.parentElement;
+      if (!groups.has(parent)) groups.set(parent, []);
+      groups.get(parent).push(task);
+    });
+
+    groups.forEach((items, parent) => {
+      items.sort((a, b) => {
+        const da = a.dateInput.value;
+        const db = b.dateInput.value;
+        if (!da && !db) return a.sortOrder - b.sortOrder;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da.localeCompare(db) || a.sortOrder - b.sortOrder;
+      });
+
+      items.forEach(task => parent.appendChild(task.item));
+    });
+  }
+
+  function saveTasks() {
+    if (!currentUser) return;
+
+    // Warteschlange verhindert, dass schnelle Änderungen
+    // sich beim Speichern gegenseitig überholen.
+    saveQueue = saveQueue.then(async () => {
+      setStatus("Synchronisiere …");
+
+      const rows = tasks.map(task => ({
+        user_id: currentUser.id,
+        task_key: task.key,
+        title: task.title,
+        completed: task.checkbox.checked,
+        due_date: task.dateInput.value || null,
+        sort_order: task.sortOrder,
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await client
+        .from("todo_tasks")
+        .upsert(rows, { onConflict: "user_id,task_key" });
+
+      if (error) throw error;
+      setStatus("Synchronisiert");
+    }).catch(error => {
+      console.error(error);
+      setStatus("Speichern fehlgeschlagen: " + error.message);
+    });
+
+    return saveQueue;
+  }
+
+  function showApp(user) {
+    currentUser = user;
+    $("auth-panel").hidden = true;
+    $("app-panel").hidden = false;
+    $("todo-content").hidden = false;
+    $("user-email").textContent = user.email || "";
+  }
+
+  async function openApp(user) {
+    showApp(user);
+    tasks = collectTasks();
+
+    try {
+      setStatus("Lade Aufgaben …");
+      await loadTasks();
+
+      tasks.forEach(task => {
+        task.checkbox.addEventListener("change", () => {
+          saveTasks();
+        });
+
+        task.dateInput.addEventListener("change", async () => {
+          sortTasks();
+          await saveTasks();
+        });
+      });
+
+      setStatus("Synchronisiert");
+    } catch (error) {
+      console.error(error);
+      setStatus("Fehler beim Laden: " + error.message);
+    }
+  }
+
+  $("login").addEventListener("click", async () => {
+    const { data, error } = await client.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+
+    if (error) return setMessage(error.message);
+    await openApp(data.user);
+  });
+
+  $("register").addEventListener("click", async () => {
+    const { data, error } = await client.auth.signUp({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+
+    if (error) return setMessage(error.message);
+
+    if (!data.session) {
+      setMessage("Prüfe deine E-Mails und bestätige deine Registrierung.");
+    } else {
+      await openApp(data.user);
+    }
+  });
+
+  $("reset-password").addEventListener("click", async () => {
+    const email = $("email").value.trim();
+    if (!email) return setMessage("Gib zuerst deine E-Mail-Adresse ein.");
+
+    const { error } = await client.auth.resetPasswordForEmail(email);
+    setMessage(error ? error.message : "Falls ein Konto existiert, erhältst du eine E-Mail.");
+  });
+
+  $("logout").addEventListener("click", async () => {
+    const { error } = await client.auth.signOut();
+    if (error) return setStatus(error.message);
+
+    currentUser = null;
+    tasks = [];
+    $("app-panel").hidden = true;
+    $("todo-content").hidden = true;
+    $("auth-panel").hidden = false;
+    setMessage("Du wurdest abgemeldet.");
+  });
+
+  const { data, error } = await client.auth.getSession();
+
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
+
+  if (data.session) {
+    await openApp(data.session.user);
+  }
+});
+</script>
