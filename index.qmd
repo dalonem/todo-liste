@@ -19,7 +19,6 @@ format:
       placeholder="E-Mail-Adresse"
       required
     />
-
     <label for="password">Passwort</label>
     <input
       id="password"
@@ -28,7 +27,6 @@ format:
       placeholder="Passwort"
       required
     />
-
     <button id="login-submit-hidden" type="submit" hidden>Absenden</button>
   </form>
 
