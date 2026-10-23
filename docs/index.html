@@ -107,9 +107,17 @@ Anmeldung
 Melde dich an, um deine Aufgaben zu laden.
 </p>
 <form id="login-form">
-<label for="email">E-Mail</label> <input id="email" type="email" autocomplete="username" placeholder="E-Mail-Adresse" required=""> <label for="password">Passwort</label> <input id="password" type="password" autocomplete="current-password" placeholder="Passwort" required="">
+<p><label for="email">E-Mail</label> <input id="email" type="email" autocomplete="username" placeholder="E-Mail-Adresse" required=""></p>
+<p><label for="password">Passwort</label> <input id="password" type="password" autocomplete="current-password" placeholder="Passwort" required=""></p>
+<button id="login-submit-hidden" type="submit" hidden="">
+Absenden
+</button>
 </form>
-<p><button id="login" type="submit">Anmelden</button> <button id="register" type="button">Konto erstellen</button> <button id="reset-password" type="button">Passwort zurücksetzen</button></p>
+<div class="auth-buttons">
+<pre><code>&lt;button id="login" type="button"&gt;Anmelden&lt;/button&gt;
+&lt;button id="register" type="button"&gt;Konto erstellen&lt;/button&gt;
+&lt;button id="reset-password" type="button"&gt;Passwort zurücksetzen&lt;/button&gt;</code></pre>
+</div>
 </div>
 <div id="app-panel" hidden="">
 <p>
@@ -404,19 +412,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  $("login-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function loginUser() {
+    const email = $("email").value.trim();
+    const password = $("password").value;
+
+    if (!email || !password) {
+      setMessage("Bitte E-Mail-Adresse und Passwort eingeben.");
+      return;
+    }
+
     $("login").disabled = true;
     setMessage("Anmeldung läuft …");
 
     try {
       const { data, error } = await client.auth.signInWithPassword({
-        email: $("email").value.trim(),
-        password: $("password").value
+        email,
+        password
       });
 
       if (error) {
         setMessage("Anmeldung fehlgeschlagen: " + error.message);
+        return;
+      }
+
+      if (!data.user) {
+        setMessage("Anmeldung fehlgeschlagen: Kein Nutzer zurückgegeben.");
         return;
       }
 
@@ -426,6 +446,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     } finally {
       $("login").disabled = false;
     }
+  }
+
+  $("login").addEventListener("click", loginUser);
+
+  $("login-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loginUser();
   });
 
   $("register").addEventListener("click", async () => {
